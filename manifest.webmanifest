@@ -1,0 +1,17 @@
+{
+  "name": "LimbFit Stairs · Seated Four-Limb Strength Game",
+  "short_name": "LimbFit",
+  "description": "Seated game-based strength training for both hands and both feet, ESP32 + EMQX MQTT",
+  "lang": "en",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1B1F3B",
+  "theme_color": "#1B1F3B",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

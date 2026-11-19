@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>LimbFit Stairs · Seated Four-Limb Strength Game</title>
+<meta name="theme-color" content="#1B1F3B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LimbFit">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/vendor/mqtt.min.js"></script>
+</head>
+<body>
+
+<!-- The whole game scene lives in #scaleRoot and is scaled to fill the screen -->
+<div id="scaleRoot">
+  <div class="stars"></div>
+
+  <div class="stage-wrap" id="stageWrap">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="live-timer-badge" id="liveTimer">0.0 s</div>
+      <div class="spacer"></div>
+      <div class="conn-chip" id="connChip"><span class="status-dot" id="statusDot"></span><span id="connText">Offline</span></div>
+      <div class="battery-badge" id="batteryBadge" title="Device battery">
+        <svg class="battery-ico" viewBox="0 0 30 16" width="30" height="16" aria-hidden="true">
+          <rect x="1" y="1.5" width="24" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <rect x="26" y="5" width="3" height="6" rx="1" fill="currentColor"/>
+          <rect id="batFill" x="3" y="3.5" width="0" height="9" rx="1.5" fill="currentColor"/>
+        </svg>
+        <span id="batText">--%</span>
+      </div>
+    </div>
+
+    <!-- Cue bar: which limb, press or step -->
+    <div class="cue-bar" id="cueBar">
+      <div class="cue-icon" id="cueIcon"></div>
+      <div class="cue-text">
+        <div class="cue-main" id="cueMain">--</div>
+        <div class="cue-sub" id="cueSub">--</div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="center-path"></div>
+      <div class="ground"><div class="ground-label">START</div></div>
+      <!-- steps + character injected by JS -->
+    </div>
+
+    <!-- Live force of the four limbs -->
+    <div class="force-strip" id="forceStrip"></div>
+
+    <!-- Mode selection -->
+    <div class="select-banner show" id="selectBanner">
+      <h2>Select Mode</h2>
+      <div class="level-list" id="levelList"></div>
+      <p class="hint">Any <b>left</b> limb (left hand / left foot) = next option<br>Any <b>right</b> limb (right hand / right foot) = confirm</p>
+      <p class="current-level" id="currentLevelText">Selected: Light Force</p>
+    </div>
+
+    <!-- Ready -->
+    <div class="win-banner" id="readyBanner">
+      <p class="current-level" id="readyLevelText">Mode: Light Force</p>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-ico" data-ico="hand"></span><span>Hand: seated, press the palm down</span></div>
+        <div class="legend-item"><span class="legend-ico" data-ico="foot"></span><span>Foot: seated, press the sole down</span></div>
+      </div>
+      <p class="key-prompt">Press any sensor to start</p>
+      <p class="ready-note">The timer starts the moment you press</p>
+    </div>
+
+    <!-- Result -->
+    <div class="win-banner" id="winBanner">
+      <svg width="44" height="44" viewBox="0 0 100 100">
+        <line x1="30" y1="15" x2="30" y2="88" stroke="#F5EFE0" stroke-width="4" stroke-linecap="round"/>
+        <path d="M30 18 L78 30 L30 46 Z" fill="#F2A65A"/>
+        <circle cx="30" cy="88" r="6" fill="#3AAFA9"/>
+      </svg>
+      <h2 id="winTitle">You reached the top!</h2>
+      <div class="win-time-main" id="winTimeText">--</div>
+      <div class="win-time-label" id="winTimeLabel">YOUR TIME</div>
+      <div class="history-wrap">
+        <div class="history-title" id="historyTitle">LAST 10 RESULTS</div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+      <p class="key-prompt" id="endKeyPrompt">Press any sensor to continue</p>
+      <div class="end-confirm-hint" id="endConfirmHint" style="display:none;">
+        <p class="ask">Leave this screen?</p>
+        <p class="go">Right hand / right foot &rarr; leave, choose a mode</p>
+        <p class="back">Left hand / left foot &rarr; stay and keep viewing results</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Menu drawer (not scaled, real pixels) -->
+<div class="drawer-mask" id="drawerMask"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <h2>Menu</h2>
+    <button class="btn-ghost" id="drawerClose">Close</button>
+  </div>
+
+  <div class="card">
+    <h3>Game</h3>
+    <div class="device-row"><span>Mode: <b id="levelDisplay">Not selected</b></span><span id="progressLabel">Progress: 0 / 10</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="btn-row">
+      <button class="btn-primary" id="btnRestart">Restart round</button>
+      <button class="btn-ghost" id="btnChangeMode">Change mode</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><span class="status-dot" id="statusDot2"></span>Device &amp; EMQX connection</h3>
+    <div class="device-row"><span>Device: <b id="devState">Offline</b></span><span>Battery: <b id="batDetail">--</b></span></div>
+    <label for="brokerUrl">Broker WebSocket URL</label>
+    <input type="text" id="brokerUrl" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label for="topicBase">Topic prefix (event / force / status / cmd)</label>
+    <input type="text" id="topicBase" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="btn-row">
+      <button class="btn-primary" id="connectBtn">Connect</button>
+      <button class="btn-ghost" id="btnTare">Zero sensors</button>
+    </div>
+    <p class="note">Keep all four sensors unloaded while zeroing. Changes to the URL or prefix apply after pressing Connect again.</p>
+  </div>
+
+  <div class="card">
+    <h3>Manual test (no hardware)</h3>
+    <div class="test-grid" id="testGrid"></div>
+  </div>
+
+  <div class="card">
+    <h3>Message log</h3>
+    <div class="log" id="log"></div>
+  </div>
+</aside>
+
+<script src="js/config.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/game.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+</script>
+</body>
+</html>
